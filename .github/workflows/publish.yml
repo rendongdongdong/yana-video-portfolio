@@ -1,0 +1,46 @@
+name: Publish portfolio
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download portfolio files
+        env:
+          SOURCE_BASE: https://yana-video-archive.cheeky-squid-5790.chatgpt.site
+        run: |
+          set -euo pipefail
+          rm -rf site
+          mkdir -p site
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+            mkdir -p "site/$(dirname "$file")"
+            curl --fail --location --retry 5 --retry-delay 2               "$SOURCE_BASE/$file"               --output "site/$file"
+          done < deploy-manifest.txt
+          touch site/.nojekyll
+
+      - name: Publish gh-pages branch
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/yana-site
+          cp -a site /tmp/yana-site
+          git checkout --orphan gh-pages
+          git rm -rf . || true
+          cp -a /tmp/yana-site/. .
+          git add -A
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Publish portfolio"
+          git push --force origin gh-pages
