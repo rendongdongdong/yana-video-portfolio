@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Download portfolio files
         env:
@@ -25,9 +25,11 @@ jobs:
           rm -rf site
           mkdir -p site
           while IFS= read -r file; do
+            file="${file//$'\r'/}"
+            file="${file#$'\xef\xbb\xbf'}"
             [ -z "$file" ] && continue
             mkdir -p "site/$(dirname "$file")"
-            curl --fail --location --retry 5 --retry-delay 2               "$SOURCE_BASE/$file"               --output "site/$file"
+            curl --fail --location --retry 5 --retry-delay 2 "$SOURCE_BASE/$file" --output "site/$file"
           done < deploy-manifest.txt
           touch site/.nojekyll
 
