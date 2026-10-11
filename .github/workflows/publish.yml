@@ -33,6 +33,27 @@ jobs:
           done < deploy-manifest.txt
           touch site/.nojekyll
 
+      - name: Convert videos to streamable MP4 files
+        run: |
+          python - <<'PY'
+          import json
+          import shutil
+          from pathlib import Path
+
+          videos = Path("site/assets/videos")
+          for manifest_path in videos.glob("*.parts/manifest.json"):
+              parts_dir = manifest_path.parent
+              output_path = videos / f"{parts_dir.name.removesuffix('.parts')}.mp4"
+              names = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
+              with output_path.open("wb") as output:
+                  for name in names:
+                      with (parts_dir / name).open("rb") as part:
+                          shutil.copyfileobj(part, output)
+              shutil.rmtree(parts_dir)
+
+          shutil.copytree("overrides", "site", dirs_exist_ok=True)
+          PY
+
       - name: Publish gh-pages branch
         run: |
           set -euo pipefail
