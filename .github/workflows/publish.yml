@@ -58,6 +58,36 @@ jobs:
           shutil.copytree("overrides", "site", dirs_exist_ok=True)
           PY
 
+      - name: Optimize covers and videos for web playback
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+
+          for video in site/assets/videos/*.mp4; do
+            [ -f "$video" ] || continue
+            optimized="${video%.mp4}.optimized.mp4"
+            ffmpeg -y -hide_banner -loglevel error               -i "$video"               -map 0:v:0 -map '0:a?'               -vf "scale=1280:1280:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos,fps=30"               -c:v libx264 -preset medium -crf 26 -profile:v high -level 4.1 -pix_fmt yuv420p               -c:a aac -b:a 96k -ac 2               -movflags +faststart -map_metadata -1               "$optimized"
+            if [ "$(stat -c%s "$optimized")" -lt "$(stat -c%s "$video")" ]; then
+              mv "$optimized" "$video"
+            else
+              rm "$optimized"
+            fi
+          done
+
+          for cover in site/assets/covers/*.webp; do
+            [ -f "$cover" ] || continue
+            optimized="${cover%.webp}.optimized.webp"
+            ffmpeg -y -hide_banner -loglevel error               -i "$cover"               -vf "scale=1280:1280:force_original_aspect_ratio=decrease:flags=lanczos"               -frames:v 1 -c:v libwebp -quality 78 -compression_level 6               "$optimized"
+            if [ "$(stat -c%s "$optimized")" -lt "$(stat -c%s "$cover")" ]; then
+              mv "$optimized" "$cover"
+            else
+              rm "$optimized"
+            fi
+          done
+
       - name: Publish gh-pages branch
         run: |
           set -euo pipefail
@@ -70,5 +100,5 @@ jobs:
           git add -A
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "Publish portfolio"
+          git commit -m "Publish optimized portfolio"
           git push --force origin gh-pages
